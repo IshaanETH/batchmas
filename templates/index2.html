@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Configuration Input</h2>
+<form id="calcForm" method="POST" class="mt-4">
+    <div class="row g-3">
+        <div class="col-md-6">
+            <div class="form-group">
+                <label class="form-label">Entry Level</label>
+                <select class="form-control" name="entry_level" required>
+                    <option value="0">0</option>
+                    <option value="1">1</option>
+                    <option value="2">2</option>
+                </select>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="form-group">
+                <label class="form-label">Start DateTime (YYYY-MM-DD HH:MM:SS)</label>
+                <input type="text" class="form-control" name="start_date" value="2025-05-06 00:00:00" required>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="form-group">
+                <label class="form-label">Default Effective Days</label>
+                <input type="number" class="form-control" name="apat_default_effective_days" value="6" required>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="form-group">
+                <label class="form-label">Effective Days</label>
+                <input type="number" class="form-control" name="apat_effective_days" value="2" required>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="form-group">
+                <label class="form-label">Pricing Closer Days</label>
+                <input type="number" class="form-control" name="apat_pricing_closer_days" value="4" required>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="form-group">
+                <label class="form-label">Pricing Closer Time</label>
+                <input type="text" class="form-control" name="apat_pricing_closer_time" value="23:59:59" required>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="form-group">
+                <label class="form-label">Cutoff Time</label>
+                <input type="text" class="form-control" name="cut_off_time" value="13:00:00" required>
+            </div>
+        </div>
+        <div class="col-md-12">
+            <div class="form-group">
+                <label class="form-label">Timezone</label>
+                <input type="text" class="form-control" name="timezone" value="CET" required>
+            </div>
+        </div>
+    </div>
+    <button type="submit" class="btn btn-primary mt-3">Calculate</button>
+    <div id="errorMessage" class="error-message"></div>
+</form>
+
+<div id="resultsContainer" class="mt-4" style="display: none;">
+    <h2>Results</h2>
+    <div class="table-responsive">
+        <table class="table table-striped">
+            <thead class="table-dark">
+                <tr>
+                    <th>Batch Date</th>
+                    <th>Min Submission</th>
+                    <th>Max Submission</th>
+                    <th>Min Effective</th>
+                    <th>Max Effective</th>
+                </tr>
+            </thead>
+            <tbody id="resultsTableBody">
+                <!-- Results will be inserted here -->
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+$(document).ready(function() {
+    $('#calcForm').on('submit', function(e) {
+        e.preventDefault();
+        $('#errorMessage').text('').hide();
+        $('#resultsContainer').hide();
+        
+        $.ajax({
+            type: 'POST',
+            url: '/',
+            data: $(this).serialize(),
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            success: function(response) {
+                if (response.error) {
+                    $('#errorMessage').text(response.error).show();
+                    return;
+                }
+                
+                var tableBody = $('#resultsTableBody');
+                tableBody.empty();
+                
+                if (response.length === 0) {
+                    tableBody.append('<tr><td colspan="5" class="text-center">No results found</td></tr>');
+                } else {
+                    $.each(response, function(index, row) {
+                        tableBody.append(
+                            '<tr>' +
+                            '<td>' + row['Batch Date'] + '</td>' +
+                            '<td>' + row['Min Submission'] + '</td>' +
+                            '<td>' + row['Max Submission'] + '</td>' +
+                            '<td>' + row['Min Effective'] + '</td>' +
+                            '<td>' + row['Max Effective'] + '</td>' +
+                            '</tr>'
+                        );
+                    });
+                }
+                
+                $('#resultsContainer').show();
+            },
+            error: function(xhr) {
+                try {
+                    var errorResponse = JSON.parse(xhr.responseText);
+                    $('#errorMessage').text(errorResponse.error || 'An error occurred').show();
+                } catch (e) {
+                    $('#errorMessage').text('An error occurred while processing your request.').show();
+                }
+            }
+        });
+    });
+});
+</script>
+{% endblock %}

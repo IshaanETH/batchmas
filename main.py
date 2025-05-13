@@ -1,6 +1,9 @@
-from flask import Flask, render_template, request
+from flask import Flask, render_template, request, jsonify, send_file
 from datetime import datetime, timedelta, time
 import pytz
+import pandas as pd
+from io import BytesIO, StringIO
+import csv
 
 app = Flask(__name__)
 
@@ -13,22 +16,16 @@ def convert_local_to_utc(date_time, tz_name):
         local_dt = local_tz.localize(naive, is_dst=None)
     return local_dt.astimezone(pytz.utc)
 
-def convert_utc_to_local(utc_str, tz_name):
-    utc_dt = datetime.strptime(utc_str, '%Y-%m-%d %H:%M:%S').replace(tzinfo=pytz.utc)
-    local_tz = pytz.timezone(tz_name)
-    return utc_dt.astimezone(local_tz)
-
-@app.route('/', methods=['GET', 'POST'])
-def index():
-    if request.method == 'POST':
-        entry_level = int(request.form['entry_level'])
-        apat_default_effective_days = int(request.form['apat_default_effective_days'])
-        apat_effective_days = int(request.form['apat_effective_days'])
-        timez = request.form['timezone']
-        apat_pricing_closer_days = int(request.form['apat_pricing_closer_days'])
-        apat_pricing_closer_time_str = request.form['apat_pricing_closer_time']
-        cut_off_time = request.form['cut_off_time']
-        start_input = request.form['start_date']
+def process_single_row(input_data):
+    try:
+        entry_level = int(input_data.get('entry_level', 0))
+        apat_default_effective_days = int(input_data.get('apat_default_effective_days', 6))
+        apat_effective_days = int(input_data.get('apat_effective_days', 2))
+        timez = input_data.get('timezone', 'CET')
+        apat_pricing_closer_days = int(input_data.get('apat_pricing_closer_days', 4))
+        apat_pricing_closer_time_str = input_data.get('apat_pricing_closer_time', '23:59:59')
+        cut_off_time = input_data.get('cut_off_time', '13:00:00')
+        start_input = input_data.get('start_date', '2025-05-06 00:00:00')
 
         output = []
 
@@ -54,11 +51,11 @@ def index():
             max_effective_date = datetime.combine(apat_pricing_closer_dt.date() + timedelta(days=apat_effective_days), time(0, 0, 0))
 
             output.append({
-                "Batch Date": batch_date,
-                "Min Submission": min_sub_datetime,
-                "Max Submission": max_sub_datetime,
-                "Min Effective": min_effective_date,
-                "Max Effective": max_effective_date
+                "Batch Date": str(batch_date),
+                "Min Submission": str(min_sub_datetime),
+                "Max Submission": str(max_sub_datetime),
+                "Min Effective": str(min_effective_date),
+                "Max Effective": str(max_effective_date)
             })
 
         else:
@@ -109,14 +106,123 @@ def index():
 
                 if entry_created:
                     output.append({
-                        "Batch Date": batch_date,
-                        "Min Submission": min_sub_datetime,
-                        "Max Submission": max_sub_datetime,
-                        "Min Effective": min_effective_date,
-                        "Max Effective": max_effective_date
+                        "Batch Date": str(batch_date),
+                        "Min Submission": str(min_sub_datetime),
+                        "Max Submission": str(max_sub_datetime),
+                        "Min Effective": str(min_effective_date),
+                        "Max Effective": str(max_effective_date)
                     })
 
-        return render_template('results.html', results=output)
+        return output
+    except Exception as e:
+        print(f"Error processing row: {str(e)}")
+        return []
 
+@app.route('/', methods=['GET', 'POST'])
+def index():
+    if request.method == 'POST':
+        # Handle CSV upload
+        if 'csv_file' in request.files:
+            csv_file = request.files['csv_file']
+            if csv_file.filename.endswith('.csv'):
+                try:
+                    # Read CSV data
+                    stream = StringIO(csv_file.stream.read().decode("UTF8"), newline=None)
+                    csv_input = csv.DictReader(stream)
+                    
+                    # Create Excel file in memory
+                    output = BytesIO()
+                    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+                        workbook = writer.book
+                        
+                        # Format for headers
+                        header_format = workbook.add_format({
+                            'bold': True,
+                            'text_wrap': True,
+                            'valign': 'top',
+                            'fg_color': '#D7E4BC',
+                            'border': 1
+                        })
+                        
+                        # Process each row
+                        for idx, row in enumerate(csv_input, 1):
+                            results = process_single_row(row)
+                            if not results:
+                                continue
+                                
+                            sheet_name = f"Case_{idx}"
+                            
+                            # Create DataFrames
+                            input_df = pd.DataFrame([row])
+                            results_df = pd.DataFrame(results)
+                            
+                            # Write to Excel
+                            input_df.to_excel(
+                                writer,
+                                sheet_name=sheet_name,
+                                index=False,
+                                startrow=0
+                            )
+                            
+                            results_df.to_excel(
+                                writer,
+                                sheet_name=sheet_name,
+                                index=False,
+                                startrow=len(input_df) + 3  # Add some spacing
+                            )
+                            
+                            # Apply formatting
+                            worksheet = writer.sheets[sheet_name]
+                            
+                            # Format input header
+                            worksheet.set_row(0, None, header_format)
+                            
+                            # Format results header
+                            results_header_row = len(input_df) + 3
+                            worksheet.set_row(results_header_row, None, header_format)
+                            
+                            # Add labels
+                            worksheet.write(len(input_df) + 1, 0, "Results:")
+                            
+                            # Auto-adjust column widths
+                            for i, col in enumerate(input_df.columns):
+                                max_len = max((
+                                    input_df[col].astype(str).map(len).max(),
+                                    len(str(col))
+                                )) + 2
+                                worksheet.set_column(i, i, max_len)
+                            
+                            for i, col in enumerate(results_df.columns):
+                                max_len = max((
+                                    results_df[col].astype(str).map(len).max(),
+                                    len(str(col))
+                                )) + 2
+                                worksheet.set_column(i, i, max_len)
+                    
+                    output.seek(0)
+                    return send_file(
+                        output,
+                        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                        as_attachment=True,
+                        download_name='batch_results.xlsx'
+                    )
+                except Exception as e:
+                    return jsonify({'error': f'Error processing CSV: {str(e)}'}), 400
+            return jsonify({'error': 'Please upload a CSV file'}), 400
+        
+        # Handle single form submission
+        try:
+            form_data = request.form.to_dict()
+            results = process_single_row(form_data)
+            
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return jsonify(results)
+            
+            return render_template('index.html', results=results)
+        except Exception as e:
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return jsonify({'error': str(e)}), 400
+            return render_template('index.html', error=str(e))
+    
     return render_template('index.html')
 

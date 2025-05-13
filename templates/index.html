@@ -1,43 +1,224 @@
 {% extends "base.html" %}
 {% block content %}
-<h2>Configuration Input</h2>
-<form method="POST" class="mt-4">
-    <div class="form-group">
-        <label>Entry Level</label>
-        <select class="form-control" name="entry_level">
-            <option value="0">0</option>
-            <option value="1">1</option>
-            <option value="2">2</option>
-        </select>
+<div class="row">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                Single Calculation
+            </div>
+            <div class="card-body">
+                <form id="singleForm" method="POST">
+                    <div class="form-section">
+                        <label class="form-label">Entry Level</label>
+                        <select class="form-control" name="entry_level" required>
+                            <option value="0">0</option>
+                            <option value="1">1</option>
+                            <option value="2">2</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-section">
+                        <label class="form-label">Start DateTime (YYYY-MM-DD HH:MM:SS)</label>
+                        <input type="text" class="form-control" name="start_date" value="2025-05-06 00:00:00" required>
+                    </div>
+                    
+                    <div class="form-section">
+                        <label class="form-label">Default Effective Days</label>
+                        <input type="number" class="form-control" name="apat_default_effective_days" value="6" required>
+                    </div>
+                    
+                    <div class="form-section">
+                        <label class="form-label">Effective Days</label>
+                        <input type="number" class="form-control" name="apat_effective_days" value="2" required>
+                    </div>
+                    
+                    <div class="form-section">
+                        <label class="form-label">Pricing Closer Days</label>
+                        <input type="number" class="form-control" name="apat_pricing_closer_days" value="4" required>
+                    </div>
+                    
+                    <div class="form-section">
+                        <label class="form-label">Pricing Closer Time</label>
+                        <input type="text" class="form-control" name="apat_pricing_closer_time" value="23:59:59" required>
+                    </div>
+                    
+                    <div class="form-section">
+                        <label class="form-label">Cutoff Time</label>
+                        <input type="text" class="form-control" name="cut_off_time" value="13:00:00" required>
+                    </div>
+                    
+                    <div class="form-section">
+                        <label class="form-label">Timezone</label>
+                        <input type="text" class="form-control" name="timezone" value="CET" required>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary">Calculate</button>
+                </form>
+                <div id="singleError" class="error-message"></div>
+            </div>
+        </div>
     </div>
-    <div class="form-group">
-        <label>Start DateTime (YYYY-MM-DD HH:MM:SS)</label>
-        <input type="text" class="form-control" name="start_date" value="2025-05-06 00:00:00">
+    
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                Batch Processing (CSV Upload)
+            </div>
+            <div class="card-body">
+                <form id="batchForm" method="POST" enctype="multipart/form-data">
+                    <div class="form-section">
+                        <label for="csv_file" class="form-label">Upload CSV File</label>
+                        <input class="form-control" type="file" id="csv_file" name="csv_file" accept=".csv" required>
+                        <small class="form-text text-muted">
+                            CSV should contain columns: entry_level, start_date, apat_default_effective_days, 
+                            apat_effective_days, timezone, apat_pricing_closer_days, apat_pricing_closer_time, cut_off_time
+                        </small>
+                    </div>
+                    <button type="submit" class="btn btn-success">Process CSV</button>
+                </form>
+                <div id="batchError" class="error-message"></div>
+                <div id="downloadSection" class="mt-3" style="display:none;">
+                    <a id="downloadLink" href="#" class="btn btn-primary">Download Excel Results</a>
+                </div>
+            </div>
+        </div>
     </div>
-    <div class="form-group">
-        <label>Default Effective Days</label>
-        <input type="number" class="form-control" name="apat_default_effective_days" value="6">
+</div>
+
+<div id="resultsContainer" class="card mt-4" style="display: none;">
+    <div class="card-header">
+        Results
     </div>
-    <div class="form-group">
-        <label>Effective Days</label>
-        <input type="number" class="form-control" name="apat_effective_days" value="2">
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Batch Date</th>
+                        <th>Min Submission</th>
+                        <th>Max Submission</th>
+                        <th>Min Effective</th>
+                        <th>Max Effective</th>
+                    </tr>
+                </thead>
+                <tbody id="resultsTableBody">
+                    <!-- Results will be inserted here -->
+                </tbody>
+            </table>
+        </div>
     </div>
-    <div class="form-group">
-        <label>Pricing Closer Days</label>
-        <input type="number" class="form-control" name="apat_pricing_closer_days" value="4">
-    </div>
-    <div class="form-group">
-        <label>Pricing Closer Time</label>
-        <input type="text" class="form-control" name="apat_pricing_closer_time" value="23:59:59">
-    </div>
-    <div class="form-group">
-        <label>Cutoff Time</label>
-        <input type="text" class="form-control" name="cut_off_time" value="13:00:00">
-    </div>
-    <div class="form-group">
-        <label>Timezone</label>
-        <input type="text" class="form-control" name="timezone" value="CET">
-    </div>
-    <button type="submit" class="btn btn-primary mt-3">Submit</button>
-</form>
+</div>
+
+<script>
+$(document).ready(function() {
+    // Handle single form submission
+    $('#singleForm').on('submit', function(e) {
+        e.preventDefault();
+        $('#singleError').text('').hide();
+        $('#resultsContainer').hide();
+        
+        $.ajax({
+            type: 'POST',
+            url: '/',
+            data: $(this).serialize(),
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            success: function(response) {
+                if (response.error) {
+                    $('#singleError').text(response.error).show();
+                    return;
+                }
+                
+                var tableBody = $('#resultsTableBody');
+                tableBody.empty();
+                
+                if (response.length === 0) {
+                    tableBody.append('<tr><td colspan="5" class="text-center">No results found</td></tr>');
+                } else {
+                    $.each(response, function(index, row) {
+                        tableBody.append(
+                            '<tr>' +
+                            '<td>' + row['Batch Date'] + '</td>' +
+                            '<td>' + row['Min Submission'] + '</td>' +
+                            '<td>' + row['Max Submission'] + '</td>' +
+                            '<td>' + row['Min Effective'] + '</td>' +
+                            '<td>' + row['Max Effective'] + '</td>' +
+                            '</tr>'
+                        );
+                    });
+                }
+                
+                $('#resultsContainer').show();
+            },
+            error: function(xhr) {
+                try {
+                    var errorResponse = JSON.parse(xhr.responseText);
+                    $('#singleError').text(errorResponse.error || 'An error occurred').show();
+                } catch (e) {
+                    $('#singleError').text('An error occurred while processing your request.').show();
+                }
+            }
+        });
+    });
+
+    // Handle batch form submission
+    $('#batchForm').on('submit', function(e) {
+        e.preventDefault();
+        $('#batchError').text('').hide();
+        
+        var formData = new FormData(this);
+        
+        $.ajax({
+            url: '/',
+            type: 'POST',
+            data: formData,
+            processData: false,
+            contentType: false,
+            xhr: function() {
+                var xhr = new XMLHttpRequest();
+                xhr.onreadystatechange = function() {
+                    if (xhr.readyState == 2) {
+                        if (xhr.status == 200) {
+                            // Check if response is Excel
+                            var contentType = xhr.getResponseHeader('Content-Type');
+                            if (contentType && contentType.indexOf('application/vnd.openxmlformats') !== -1) {
+                                xhr.responseType = 'blob';
+                            }
+                        }
+                    }
+                };
+                return xhr;
+            },
+            success: function(data, status, xhr) {
+                var contentType = xhr.getResponseHeader('Content-Type');
+                if (contentType && contentType.indexOf('application/vnd.openxmlformats') !== -1) {
+                    // Handle Excel file download
+                    var blob = new Blob([data], {type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+                    var url = URL.createObjectURL(blob);
+                    $('#downloadLink').attr('href', url);
+                    $('#downloadSection').show();
+                } else {
+                    try {
+                        var response = JSON.parse(data);
+                        if (response.error) {
+                            $('#batchError').text(response.error).show();
+                        }
+                    } catch (e) {
+                        $('#batchError').text('Error processing file').show();
+                    }
+                }
+            },
+            error: function(xhr) {
+                try {
+                    var errorResponse = JSON.parse(xhr.responseText);
+                    $('#batchError').text(errorResponse.error || 'Error processing file').show();
+                } catch (e) {
+                    $('#batchError').text('Error processing file').show();
+                }
+            }
+        });
+    });
+});
+</script>
 {% endblock %}
