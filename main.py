@@ -98,8 +98,10 @@ def process_single_row(input_data):
                     prev_batch = batch_date
 
                     max_sub_datetime = datetime.combine(start_dt.date(), cut_off_time_conv.time()).replace(tzinfo=None) - timedelta(seconds=1)
-                    min_effective_date = datetime.combine(start_dt.date() + timedelta(days=1), time(0, 0, 0))
-
+                    if entry_level == 2:
+                        min_effective_date = datetime.combine(start_dt.date() + timedelta(days=apat_default_effective_days), time(0, 0, 0))
+                    else:
+                        min_effective_date = datetime.combine(start_dt.date() + timedelta(days=1), time(0, 0, 0))
                     start_dt += timedelta(days=1)
 
                 max_effective_date = min_effective_date if entry_level == 2 else datetime.combine(end_dt.date() + timedelta(days=apat_effective_days), time(0, 0, 0))
