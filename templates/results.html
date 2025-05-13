@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Results</h2>
+<table class="table table-striped mt-4">
+    <thead>
+        <tr>
+            <th>Batch Date</th>
+            <th>Min Submission</th>
+            <th>Max Submission</th>
+            <th>Min Effective</th>
+            <th>Max Effective</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for row in results %}
+        <tr>
+            <td>{{ row["Batch Date"] }}</td>
+            <td>{{ row["Min Submission"] }}</td>
+            <td>{{ row["Max Submission"] }}</td>
+            <td>{{ row["Min Effective"] }}</td>
+            <td>{{ row["Max Effective"] }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+<a href="/" class="btn btn-secondary mt-3">Back</a>
+{% endblock %}
