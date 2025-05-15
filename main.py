@@ -77,19 +77,25 @@ def process_single_row(input_data):
             first_min_sub = None
             prev_batch = None
             entry_created = True
+            fin_cut_off_time_conv = None
 
             while not final_condition:
                 if start_dt.date() > end_dt.date():
-                    if utc_final_sub_time.time() > cut_off_time_conv.time():
+                    if fin_cut_off_time_conv and utc_final_sub_time.time() > fin_cut_off_time_conv.time():
                         batch_date = datetime.combine(start_dt.date() - timedelta(days=1), utc_final_sub_time.time()).replace(tzinfo=None) + timedelta(seconds=1)
                         min_sub_datetime = prev_batch
-                        max_sub_datetime = datetime.combine(start_dt.date() - timedelta(days=1), cut_off_time_conv.time()) - timedelta(seconds=1)
+                        max_sub_datetime = datetime.combine(start_dt.date() - timedelta(days=1), fin_cut_off_time_conv.time()) - timedelta(seconds=1)
                         min_effective_date = datetime.combine(start_dt.date() + timedelta(days=1), time(0, 0, 0))
                     else:
                         entry_created = False
                     final_condition = True
                 else:
-                    batch_date = datetime.combine(start_dt.date(), cut_off_time_conv.time()).replace(tzinfo=None)
+                    
+                    dt_str = f"{start_dt.date()} {cut_off_time}"
+                    local_dt = datetime.strptime(dt_str, "%Y-%m-%d %H:%M:%S")
+                    fin_cut_off_time_conv = convert_local_to_utc(local_dt, timez)
+                    
+                    batch_date = datetime.combine(start_dt.date(), fin_cut_off_time_conv.time()).replace(tzinfo=None)
                     if start_dt.date() != end_dt.date() and not first_min_sub:
                         min_sub_datetime = convert_local_to_utc(datetime.combine(start_dt.date(), time(0, 0, 0)), timez).replace(tzinfo=None)
                         first_min_sub = min_sub_datetime
@@ -97,7 +103,7 @@ def process_single_row(input_data):
                         min_sub_datetime = prev_batch
                     prev_batch = batch_date
 
-                    max_sub_datetime = datetime.combine(start_dt.date(), cut_off_time_conv.time()).replace(tzinfo=None) - timedelta(seconds=1)
+                    max_sub_datetime = datetime.combine(start_dt.date(), fin_cut_off_time_conv.time()).replace(tzinfo=None) - timedelta(seconds=1)
                     if entry_level == 2:
                         min_effective_date = datetime.combine(start_dt.date() + timedelta(days=apat_default_effective_days), time(0, 0, 0))
                     else:
