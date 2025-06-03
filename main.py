@@ -84,7 +84,7 @@ def process_single_row(input_data):
                     if fin_cut_off_time_conv and utc_final_sub_time.time() > fin_cut_off_time_conv.time():
                         batch_date = datetime.combine(start_dt.date() - timedelta(days=1), utc_final_sub_time.time()).replace(tzinfo=None) + timedelta(seconds=1)
                         min_sub_datetime = prev_batch
-                        max_sub_datetime = datetime.combine(start_dt.date() - timedelta(days=1), fin_cut_off_time_conv.time()) - timedelta(seconds=1)
+                        max_sub_datetime = datetime.combine(start_dt.date() - timedelta(days=1), utc_final_sub_time.time()) - timedelta(seconds=1)
                         min_effective_date = datetime.combine(start_dt.date() + timedelta(days=1), time(0, 0, 0))
                     else:
                         entry_created = False
