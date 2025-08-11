@@ -16,9 +16,29 @@ def convert_local_to_utc(date_time, tz_name):
         local_dt = local_tz.localize(naive, is_dst=None)
     return local_dt.astimezone(pytz.utc)
 
+def adjust_input_parameters(inputdate):
+    # Parse the dates
+    start_dt = datetime.strptime(inputdate['start_date'], '%Y-%m-%d %H:%M:%S')
+    load_dt = datetime.strptime(inputdate['loaddate'], '%Y-%m-%d %H:%M:%S')
+    
+    # If loaddate is earlier than start date
+    if load_dt < start_dt:
+        # Calculate the difference in days
+        days_diff = (start_dt - load_dt).days
+        
+        # Adjust the pricing closer days to include the additional days
+        inputdate['apat_pricing_closer_days'] = str(int(inputdate['apat_pricing_closer_days']) + days_diff)
+        
+        # Update the start_date to be the loaddate
+        inputdate['start_date'] = inputdate['loaddate']
+    
+    return inputdate
+
 def process_single_row(input_data):
     try:
         entry_level = int(input_data.get('entry_level', 0))
+        if entry_level != 0: 
+            input_data = adjust_input_parameters(input_data)
         apat_default_effective_days = int(input_data.get('apat_default_effective_days', 6))
         apat_effective_days = int(input_data.get('apat_effective_days', 2))
         timez = input_data.get('timezone', 'CET')
@@ -26,11 +46,12 @@ def process_single_row(input_data):
         apat_pricing_closer_time_str = input_data.get('apat_pricing_closer_time', '23:59:59')
         cut_off_time = input_data.get('cut_off_time', '13:00:00')
         start_input = input_data.get('start_date', '2025-05-06 00:00:00')
-
+        loaddate = input_data.get('loaddate', '2025-05-04 00:00:00')
         output = []
 
         if entry_level == 0:
             start_dt = datetime.strptime(start_input, '%Y-%m-%d %H:%M:%S')
+            loaddate = datetime.strptime(loaddate, '%Y-%m-%d %H:%M:%S')
             utc_final_sub_time = convert_local_to_utc(start_dt, timez) + timedelta(days=apat_pricing_closer_days)
 
             og_start_date = convert_local_to_utc(datetime.combine(start_dt.date(), time(0, 0, 0)), timez)
@@ -44,7 +65,7 @@ def process_single_row(input_data):
             apat_pricing_closer_dt = datetime.combine(end_dt.date(), og_convered_time)
 
             batch_date = datetime.combine(start_dt.date() + timedelta(days=apat_pricing_closer_days), max_sub_time.time()) + timedelta(seconds=1)
-            min_sub_datetime = convert_local_to_utc(datetime.combine(start_dt.date(), time(0, 0, 0)), timez).replace(tzinfo=None)
+            min_sub_datetime = convert_local_to_utc(datetime.combine(loaddate.date(), time(0, 0, 0)), timez).replace(tzinfo=None)
             max_sub_datetime = datetime.combine(start_dt.date() + timedelta(days=apat_pricing_closer_days), max_sub_time.time())
 
             min_effective_date = datetime.combine(start_dt.date() + timedelta(days=apat_default_effective_days), time(0, 0, 0))
@@ -234,3 +255,6 @@ def index():
     
     return render_template('index.html')
 
+# if __name__ == '__main__':
+#     app.run(debug=True)
+    
